@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>India Wildlife Habitat Map</title>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="libs/leaflet.css">
+
+    <style>
+        body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #eef2f3;
+}
+
+#container {
+    display: flex;
+    height: 100vh;
+}
+
+nav {
+    width: 100%;
+    background: #0d1b2a;
+    padding: 12px 0;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+nav ul {
+    list-style: none;
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    padding: 0;
+    margin: 0;
+}
+
+nav ul li {
+    display: inline-block;
+}
+
+nav ul li a {
+    text-decoration: none;
+    color: #e0e1dd;
+    font-size: 16px;
+    font-weight: 600;
+    padding: 8px 14px;
+    border-radius: 6px;
+    transition: background 0.25s ease, transform 0.15s ease;
+}
+
+nav ul li a:hover {
+    background: #1b263b;
+    color: white;
+    transform: scale(1.05);
+}
+
+#sidebar {
+    width: 340px;
+    overflow-y: auto;
+    background: white;
+    padding: 20px;
+    border-right: 2px solid #ddd;
+}
+
+#sidebar h2 {
+    margin-top: 0;
+    text-align: center;
+    font-size: 20px;
+    color: #333;
+}
+
+#speciesList {
+    padding-left: 0;
+    list-style: none;
+}
+
+.species-item {
+    padding: 12px;
+    margin-bottom: 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    border-left: 5px solid transparent;
+    background: #fafafa;
+    transition: background 0.2s ease, transform 0.1s ease;
+}
+
+.species-item:hover {
+    background: #e8f4ff;
+    transform: scale(1.01);
+    border-left: 5px solid #4da3ff;
+}
+
+#map {
+    flex: 1;
+}
+
+.leaflet-container {
+    background: #cfe0e8;
+}
+
+    </style>
+</head>
+
+<body>
+<nav>
+    <ul>
+        <li><a href="index.html">home</a></li>
+        <li><a href="upload.html">identify</a></li>
+        <li><a href="about.html">about</a></li>
+    </ul>
+</nav>
+<div id="container">
+
+    <!-- Sidebar -->
+    <div id="sidebar">
+        <h2>Wildlife Species (India)</h2>
+        <ul id="speciesList"></ul>
+    </div>
+
+    <!-- Map -->
+    <div id="map"></div>
+
+</div>
+
+<!-- Leaflet JS -->
+<script src="libs/leaflet.js"></script>
+
+<script>
+    // ----------------------
+// Initialize Map
+// ----------------------
+let map = L.map("map").setView([22.5, 79], 5);
+
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 18,
+}).addTo(map);
+
+let currentLayer = null;
+
+
+// ----------------------
+// Load Species List
+// ----------------------
+fetch("data/species.json")
+    .then(res => res.json())
+    .then(data => {
+        const list = document.getElementById("speciesList");
+        list.innerHTML = "";
+
+        data.animals.forEach(animal => {
+            const item = document.createElement("li");
+            item.classList.add("species-item");
+
+            // Show species name
+            item.textContent = animal.species_name;
+
+            // Hover → highlight habitat
+            item.addEventListener("mouseenter", () => {
+                highlightRegion(animal.habitat);
+            });
+
+            // Stop hover → reset map
+            item.addEventListener("mouseleave", resetMap);
+
+            list.appendChild(item);
+        });
+    })
+    .catch(err => console.error("❌ Error loading species JSON:", err));
+
+
+// ----------------------
+// Highlight Region
+// ----------------------
+function highlightRegion(habitat) {
+    if (!habitat) {
+        console.error("❌ No habitat provided for species");
+        return;
+    }
+
+    // Load the correct geojson file
+    fetch(`geojson/${habitat}.geojson`)
+        .then(res => {
+            if (!res.ok) throw new Error("GeoJSON not found");
+            return res.json();
+        })
+        .then(geo => {
+
+            // Remove previous highlight
+            if (currentLayer) map.removeLayer(currentLayer);
+
+            // Create new region highlight layer
+            currentLayer = L.geoJSON(geo, {
+                style: {
+                    color: "#ff3333",
+                    weight: 3,
+                    fillColor: "#ff9999",
+                    fillOpacity: 0.5
+                }
+            }).addTo(map);
+
+            // Zoom to selected region
+            map.fitBounds(currentLayer.getBounds());
+        })
+        .catch(err => {
+            console.error(`❌ Error loading habitat: ${habitat}`, err);
+        });
+}
+
+
+// ----------------------
+// Reset Map
+// ----------------------
+function resetMap() {
+    if (currentLayer) {
+        map.removeLayer(currentLayer);
+        currentLayer = null;
+    }
+}
+
+</script>
+
+</body>
+</html>
